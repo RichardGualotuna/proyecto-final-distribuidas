@@ -22,6 +22,7 @@ export interface Event {
   organizerId: number;
   createdAt?: string;
   updatedAt?: string;
+  zones?: Zone[]; // Agregar zonas opcionales al evento
 }
 
 export interface Zone {
@@ -66,11 +67,24 @@ export interface CreateEventData {
   totalCapacity: number;
   visibility: string;
   organizerId?: number;
-  zones?: Omit<Zone, 'zoneId' | 'eventId' | 'createdAt' | 'updatedAt'>[];
+  zones?: CreateZoneData[]; // Cambiar a un tipo más específico
 }
 
+// Nuevo tipo para crear zonas
+export interface CreateZoneData {
+  zoneName: string;
+  price: number;
+  zoneCapacity: number;
+}
+
+// Tipo para las respuestas de la API
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+}
+
+// Tipos para eventos con zonas incluidas
+export interface EventWithZones extends Event {
+  zones: Zone[];
 }

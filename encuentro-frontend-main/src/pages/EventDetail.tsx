@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import {
@@ -17,6 +17,21 @@ import {
   ListItem,
   ListItemText,
   Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Avatar,
 } from '@mui/material';
 import {
   Event as EventIcon,
@@ -27,31 +42,58 @@ import {
   Category as CategoryIcon,
   Visibility as VisibilityIcon,
   ArrowBack as ArrowBackIcon,
+  Share as ShareIcon,
+  Bookmark as BookmarkIcon,
+  PersonAdd as PersonAddIcon,
+  AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { eventService } from '../services/eventService';
 import { Event, Zone } from '../types';
+import { useAuthStore } from '../stores/authStore';
+import toast from 'react-hot-toast';
 
 const EventDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuthStore();
   const eventId = parseInt(id || '0');
+  
+  // Estados para la reserva
+  const [reservationDialog, setReservationDialog] = useState(false);
+  const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+  const [shareDialog, setShareDialog] = useState(false);
 
   const {
     data: event,
-    isLoading,
-    error,
+    isLoading: eventLoading,
+    error: eventError,
+    refetch: refetchEvent,
   } = useQuery<Event>(['event', eventId], () => eventService.getEventById(eventId), {
     enabled: !!eventId,
+    retry: 2,
+  });
+
+  const {
+    data: zones = [],
+    isLoading: zonesLoading,
+    error: zonesError,
+    refetch: refetchZones,
+  } = useQuery<Zone[]>(['zones', eventId], () => eventService.getEventZones(eventId), {
+    enabled: !!eventId,
+    retry: 2,
   });
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
+      case 'active':
       case 'activo':
         return 'success';
+      case 'cancelled':
       case 'cancelado':
         return 'error';
+      case 'completed':
       case 'completado':
         return 'default';
       default:
@@ -61,8 +103,10 @@ const EventDetail: React.FC = () => {
 
   const getVisibilityColor = (visibility: string) => {
     switch (visibility.toLowerCase()) {
+      case 'public':
       case 'público':
         return 'success';
+      case 'private':
       case 'privado':
         return 'warning';
       default:
@@ -70,7 +114,83 @@ const EventDetail: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, 'EEEE, d MMMM yyyy', { locale: es });
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  const formatTime = (timeString: string) => {
+    try {
+      const [hours, minutes] = timeString.split(':');
+      return `${hours}:${minutes}`;
+    } catch (error) {
+      return timeString;
+    }
+  };
+
+  const isEventActive = () => {
+    if (!event) return false;
+    const eventDate = new Date(`${event.date}T${event.time}`);
+    const now = new Date();
+    return isAfter(eventDate, now) && event.status.toLowerCase() === 'active';
+  };
+
+  const isEventSoon = () => {
+    if (!event) return false;
+    const eventDate = new Date(`${event.date}T${event.time}`);
+    const now = new Date();
+    const threeDaysFromNow = addDays(now, 3);
+    return isAfter(eventDate, now) && isBefore(eventDate, threeDaysFromNow);
+  };
+
+  const isOwner = () => {
+    return user && event && user.userId === event.organizerId;
+  };
+
+  const handleReservation = (zone: Zone) => {
+    if (!isAuthenticated) {
+      toast.error('Debes iniciar sesión para reservar');
+      navigate('/login');
+      return;
+    }
+    
+    setSelectedZone(zone);
+    setReservationDialog(true);
+  };
+
+  const handleShare = () => {
+    setShareDialog(true);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast.success('Enlace copiado al portapapeles');
+    setShareDialog(false);
+  };
+
+  const getTotalZonesCapacity = () => {
+    return zones.reduce((total, zone) => total + zone.zoneCapacity, 0);
+  };
+
+  const getAveragePrice = () => {
+    if (zones.length === 0) return 0;
+    return zones.reduce((total, zone) => total + zone.price, 0) / zones.length;
+  };
+
+  const getPriceRange = () => {
+    if (zones.length === 0) return { min: 0, max: 0 };
+    const prices = zones.map(zone => zone.price);
+    return {
+      min: Math.min(...prices),
+      max: Math.max(...prices)
+    };
+  };
+
+  if (eventLoading) {
     return (
       <Box
         display="flex"
@@ -83,7 +203,7 @@ const EventDetail: React.FC = () => {
     );
   }
 
-  if (error || !event) {
+  if (eventError || !event) {
     return (
       <Container maxWidth="md">
         <Alert severity="error">
@@ -109,7 +229,7 @@ const EventDetail: React.FC = () => {
           {event.title}
         </Typography>
         
-        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
           <Chip
             label={event.status}
             color={getStatusColor(event.status) as any}
@@ -123,7 +243,79 @@ const EventDetail: React.FC = () => {
             label={event.category}
             variant="outlined"
           />
+          {isEventSoon() && (
+            <Chip
+              label="¡Próximamente!"
+              color="warning"
+              size="small"
+            />
+          )}
+          {isOwner() && (
+            <Chip
+              label="Tu evento"
+              color="info"
+              size="small"
+            />
+          )}
         </Box>
+
+        {/* Información rápida */}
+        <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <CalendarIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Fecha
+                  </Typography>
+                  <Typography variant="body1" fontWeight="medium">
+                    {formatDate(event.date)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <TimeIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Hora
+                  </Typography>
+                  <Typography variant="body1" fontWeight="medium">
+                    {formatTime(event.time)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <LocationIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Ubicación
+                  </Typography>
+                  <Typography variant="body1" fontWeight="medium">
+                    {event.location}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <PeopleIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Capacidad
+                  </Typography>
+                  <Typography variant="body1" fontWeight="medium">
+                    {event.totalCapacity} personas
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
       </Box>
 
       <Grid container spacing={4}>
@@ -144,62 +336,55 @@ const EventDetail: React.FC = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Detalles del Evento
+                Estadísticas del Evento
               </Typography>
               
-              <List>
-                <ListItem>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <CalendarIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="body1">
-                          {format(new Date(event.date), 'EEEE, d MMMM yyyy', { locale: es })}
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </ListItem>
-                
-                <ListItem>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TimeIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="body1">
-                          {event.time}
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </ListItem>
-                
-                <ListItem>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <LocationIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="body1">
-                          {event.location}
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </ListItem>
-                
-                <ListItem>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <PeopleIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="body1">
-                          Capacidad total: {event.totalCapacity} personas
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </ListItem>
-              </List>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box textAlign="center">
+                    <Avatar sx={{ bgcolor: 'primary.main', mx: 'auto', mb: 1 }}>
+                      <EventIcon />
+                    </Avatar>
+                    <Typography variant="h6">{zones.length}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Zonas disponibles
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box textAlign="center">
+                    <Avatar sx={{ bgcolor: 'success.main', mx: 'auto', mb: 1 }}>
+                      <PeopleIcon />
+                    </Avatar>
+                    <Typography variant="h6">{getTotalZonesCapacity()}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Capacidad zonas
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box textAlign="center">
+                    <Avatar sx={{ bgcolor: 'warning.main', mx: 'auto', mb: 1 }}>
+                      <MoneyIcon />
+                    </Avatar>
+                    <Typography variant="h6">${getAveragePrice().toFixed(2)}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Precio promedio
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Box textAlign="center">
+                    <Avatar sx={{ bgcolor: 'info.main', mx: 'auto', mb: 1 }}>
+                      <LocationIcon />
+                    </Avatar>
+                    <Typography variant="h6">{event.category}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Categoría
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
             </CardContent>
           </Card>
         </Grid>
@@ -209,11 +394,31 @@ const EventDetail: React.FC = () => {
           <Card sx={{ position: 'sticky', top: 24 }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Información del Organizador
+                Información del Evento
               </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                ID del organizador: {event.organizerId}
-              </Typography>
+              
+              {zones.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Rango de Precios
+                  </Typography>
+                  <Typography variant="h5" color="primary">
+                    ${getPriceRange().min.toFixed(2)} - ${getPriceRange().max.toFixed(2)}
+                  </Typography>
+                </Box>
+              )}
+              
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Organizador
+                </Typography>
+                <Typography variant="body1">
+                  ID: {event.organizerId}
+                </Typography>
+                {isOwner() && (
+                  <Chip label="Eres el organizador" color="success" size="small" sx={{ mt: 1 }} />
+                )}
+              </Box>
               
               <Divider sx={{ my: 2 }} />
               
@@ -222,20 +427,55 @@ const EventDetail: React.FC = () => {
               </Typography>
               
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  startIcon={<EventIcon />}
-                >
-                  Reservar Entrada
-                </Button>
+                {isEventActive() && !isOwner() && (
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    startIcon={<EventIcon />}
+                    onClick={() => zones.length > 0 ? handleReservation(zones[0]) : toast.error('No hay zonas disponibles')}
+                    disabled={zones.length === 0}
+                  >
+                    Reservar Entrada
+                  </Button>
+                )}
                 
                 <Button
                   variant="outlined"
                   fullWidth
+                  startIcon={<ShareIcon />}
+                  onClick={handleShare}
                 >
                   Compartir Evento
                 </Button>
+                
+                {isAuthenticated && !isOwner() && (
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<BookmarkIcon />}
+                  >
+                    Guardar Evento
+                  </Button>
+                )}
+                
+                {isOwner() && (
+                  <>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<PersonAddIcon />}
+                    >
+                      Ver Asistentes
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => navigate(`/events/${eventId}/edit`)}
+                    >
+                      Editar Evento
+                    </Button>
+                  </>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -251,69 +491,85 @@ const EventDetail: React.FC = () => {
           Selecciona la zona que mejor se adapte a tus necesidades
         </Typography>
         
-        <Grid container spacing={3}>
-          {/* Aquí se mostrarían las zonas del evento */}
-          <Grid item xs={12} sm={6} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Zona General
-                </Typography>
-                <Typography variant="h4" color="primary" gutterBottom>
-                  $25.00
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Capacidad: 100 personas
-                </Typography>
-                <Button variant="contained" fullWidth>
-                  Seleccionar
-                </Button>
-              </CardContent>
-            </Card>
+        {zonesLoading ? (
+          <Box display="flex" justifyContent="center" py={4}>
+            <CircularProgress />
+          </Box>
+        ) : zonesError ? (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            No se pudieron cargar las zonas del evento.
+          </Alert>
+        ) : zones.length === 0 ? (
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No hay zonas configuradas para este evento
+            </Typography>
+            <Typography color="text.secondary">
+              El organizador aún no ha configurado las zonas de entrada.
+            </Typography>
+          </Paper>
+        ) : (
+          <Grid container spacing={3}>
+            {zones.map((zone) => (
+              <Grid item xs={12} sm={6} md={4} key={zone.zoneId}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 4,
+                    },
+                  }}
+                >
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      {zone.zoneName}
+                    </Typography>
+                    <Typography variant="h4" color="primary" gutterBottom>
+                      ${zone.price.toFixed(2)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      Capacidad: {zone.zoneCapacity} personas
+                    </Typography>
+                    <Button variant="contained" fullWidth>
+                      Seleccionar
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
           </Grid>
-          
-          <Grid item xs={12} sm={6} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Zona VIP
+        )}
+        
+        {/* Resumen de zonas */}
+        {zones.length > 0 && (
+          <Box sx={{ mt: 4, p: 3, bgcolor: 'grey.50', borderRadius: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Resumen de Zonas
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body2" color="text.secondary">
+                  Total de zonas: {zones.length}
                 </Typography>
-                <Typography variant="h4" color="primary" gutterBottom>
-                  $50.00
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body2" color="text.secondary">
+                  Capacidad total: {zones.reduce((sum, zone) => sum + zone.zoneCapacity, 0)} personas
                 </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Capacidad: 50 personas
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="body2" color="text.secondary">
+                  Precio promedio: ${zones.length > 0 ? (zones.reduce((sum, zone) => sum + zone.price, 0) / zones.length).toFixed(2) : '0.00'}
                 </Typography>
-                <Button variant="contained" fullWidth>
-                  Seleccionar
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Zona Premium
-                </Typography>
-                <Typography variant="h4" color="primary" gutterBottom>
-                  $75.00
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Capacidad: 25 personas
-                </Typography>
-                <Button variant="contained" fullWidth>
-                  Seleccionar
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+              </Grid>
+            </Grid>
+          </Box>
+        )}
       </Box>
     </Container>
   );
 };
 
 export default EventDetail;
-

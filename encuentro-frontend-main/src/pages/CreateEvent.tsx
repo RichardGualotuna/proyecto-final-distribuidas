@@ -40,6 +40,7 @@ const CreateEvent: React.FC = () => {
   const {
     control,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<CreateEventData>({
     defaultValues: {
@@ -53,7 +54,7 @@ const CreateEvent: React.FC = () => {
       visibility: 'público',
       zones: [
         {
-          zoneName: '',
+          zoneName: 'General',
           price: 0,
           zoneCapacity: 0,
         },
@@ -65,6 +66,10 @@ const CreateEvent: React.FC = () => {
     control,
     name: 'zones',
   });
+
+  // Observar las zonas para calcular la capacidad total automáticamente
+  const watchedZones = watch('zones');
+  const totalZoneCapacity = watchedZones?.reduce((sum, zone) => sum + (Number(zone.zoneCapacity) || 0), 0) || 0;
 
   const createEventMutation = useMutation(eventService.createEvent, {
     onSuccess: () => {
@@ -100,16 +105,52 @@ const CreateEvent: React.FC = () => {
       return;
     }
 
+    // Validar que haya al menos una zona
+    if (!data.zones || data.zones.length === 0) {
+      setError('Debe configurar al menos una zona para el evento');
+      toast.error('Debe configurar al menos una zona');
+      return;
+    }
+
+    // Validar que la capacidad total no sea menor que la suma de zonas
+    const zoneCapacitySum = data.zones.reduce((sum, zone) => sum + Number(zone.zoneCapacity), 0);
+    if (Number(data.totalCapacity) < zoneCapacitySum) {
+      setError('La capacidad total no puede ser menor que la suma de capacidades de las zonas');
+      toast.error('Error en capacidades');
+      return;
+    }
+
     // Formatear los datos antes de enviar
     const formattedData = {
       ...data,
       totalCapacity: Number(data.totalCapacity),
       organizerId: user.userId,
+      zones: data.zones.map(zone => ({
+        ...zone,
+        price: Number(zone.price),
+        zoneCapacity: Number(zone.zoneCapacity),
+      })),
     };
 
     console.log('Usuario autenticado:', user);
     console.log('Datos a enviar:', formattedData);
     createEventMutation.mutate(formattedData);
+  };
+
+  const addZone = () => {
+    append({
+      zoneName: '',
+      price: 0,
+      zoneCapacity: 0,
+    });
+  };
+
+  const removeZone = (index: number) => {
+    if (fields.length > 1) {
+      remove(index);
+    } else {
+      toast.error('Debe mantener al menos una zona');
+    }
   };
 
   const categories = [
@@ -314,7 +355,10 @@ const CreateEvent: React.FC = () => {
                       type="number"
                       label="Capacidad Total"
                       error={!!errors.totalCapacity}
-                      helperText={errors.totalCapacity?.message}
+                      helperText={
+                        errors.totalCapacity?.message || 
+                        `Capacidad configurada en zonas: ${totalZoneCapacity}`
+                      }
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   )}
@@ -340,6 +384,139 @@ const CreateEvent: React.FC = () => {
                 />
               </Grid>
             </Grid>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Configuración de zonas */}
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5">
+                  Configuración de Zonas
+                </Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={addZone}
+                >
+                  Agregar Zona
+                </Button>
+              </Box>
+
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Configure las diferentes zonas de su evento con precios y capacidades específicas
+              </Typography>
+
+              <Grid container spacing={3}>
+                {fields.map((field, index) => (
+                  <Grid item xs={12} key={field.id}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="h6">
+                            Zona {index + 1}
+                          </Typography>
+                          {fields.length > 1 && (
+                            <IconButton
+                              color="error"
+                              onClick={() => removeZone(index)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          )}
+                        </Box>
+
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={4}>
+                            <Controller
+                              name={`zones.${index}.zoneName`}
+                              control={control}
+                              rules={{
+                                required: 'El nombre de la zona es requerido',
+                              }}
+                              render={({ field }) => (
+                                <TextField
+                                  {...field}
+                                  fullWidth
+                                  label="Nombre de la Zona"
+                                  error={!!errors.zones?.[index]?.zoneName}
+                                  helperText={errors.zones?.[index]?.zoneName?.message}
+                                />
+                              )}
+                            />
+                          </Grid>
+
+                          <Grid item xs={12} sm={4}>
+                            <Controller
+                              name={`zones.${index}.price`}
+                              control={control}
+                              rules={{
+                                required: 'El precio es requerido',
+                                min: {
+                                  value: 0,
+                                  message: 'El precio no puede ser negativo',
+                                },
+                              }}
+                              render={({ field }) => (
+                                <TextField
+                                  {...field}
+                                  fullWidth
+                                  type="number"
+                                  label="Precio ($)"
+                                  error={!!errors.zones?.[index]?.price}
+                                  helperText={errors.zones?.[index]?.price?.message}
+                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                />
+                              )}
+                            />
+                          </Grid>
+
+                          <Grid item xs={12} sm={4}>
+                            <Controller
+                              name={`zones.${index}.zoneCapacity`}
+                              control={control}
+                              rules={{
+                                required: 'La capacidad es requerida',
+                                min: {
+                                  value: 1,
+                                  message: 'La capacidad debe ser mayor a 0',
+                                },
+                              }}
+                              render={({ field }) => (
+                                <TextField
+                                  {...field}
+                                  fullWidth
+                                  type="number"
+                                  label="Capacidad"
+                                  error={!!errors.zones?.[index]?.zoneCapacity}
+                                  helperText={errors.zones?.[index]?.zoneCapacity?.message}
+                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                />
+                              )}
+                            />
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+
+              {/* Resumen de zonas */}
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Resumen de Zonas
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Total de zonas: {fields.length}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Capacidad total configurada: {totalZoneCapacity} personas
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Precio promedio: ${fields.length > 0 ? ((watchedZones ?? []).reduce((sum, zone) => sum + (Number(zone.price) || 0), 0) / fields.length).toFixed(2) : '0.00'}
+                </Typography>
+              </Box>
+            </Box>
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
               <Button
