@@ -1,0 +1,12 @@
+{
+  "ID": "ms-notifications",
+  "Name": "ms-notifications",
+  "Tags": ["notification"],
+  "Address": "host.docker.internal",
+  "Port": 3001,
+  "Check": {
+    "HTTP": "http://host.docker.internal:3001/",
+    "Interval": "10s",
+    "Timeout": "1s"
+  }
+}

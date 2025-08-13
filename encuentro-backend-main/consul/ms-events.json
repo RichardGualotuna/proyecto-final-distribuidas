@@ -1,0 +1,12 @@
+{
+  "ID": "ms-events",
+  "Name": "ms-events",
+  "Tags": ["event", "zone"],
+  "Address": "host.docker.internal",
+  "Port": 3000,
+  "Check": {
+    "HTTP": "http://host.docker.internal:3000/",
+    "Interval": "10s",
+    "Timeout": "1s"
+  }
+}

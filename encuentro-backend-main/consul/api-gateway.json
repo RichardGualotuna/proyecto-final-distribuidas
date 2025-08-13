@@ -1,0 +1,12 @@
+{
+  "ID": "api-gateway",
+  "Name": "api-gateway",
+  "Tags": ["api", "gateway"],
+  "Address": "host.docker.internal",
+  "Port": 8080,
+  "Check": {
+    "HTTP": "http://host.docker.internal:8080/",
+    "Interval": "10s",
+    "Timeout": "1s"
+  }
+}

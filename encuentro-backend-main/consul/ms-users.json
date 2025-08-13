@@ -1,0 +1,12 @@
+{
+  "ID": "ms-users",
+  "Name": "ms-users",
+  "Tags": ["user"],
+  "Address": "host.docker.internal",
+  "Port": 3003,
+  "Check": {
+    "HTTP": "http://host.docker.internal:3003/",
+    "Interval": "10s",
+    "Timeout": "1s"
+  }
+}

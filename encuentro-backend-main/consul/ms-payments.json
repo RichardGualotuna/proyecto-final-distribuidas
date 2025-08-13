@@ -1,0 +1,12 @@
+{
+  "ID": "ms-payments",
+  "Name": "ms-payments",
+  "Tags": ["reservation", "ticket"],
+  "Address": "host.docker.internal",
+  "Port": 3002,
+  "Check": {
+    "HTTP": "http://host.docker.internal:3002/",
+    "Interval": "10s",
+    "Timeout": "1s"
+  }
+}
