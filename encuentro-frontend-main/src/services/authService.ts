@@ -13,13 +13,12 @@ export const authService = {
   },
 
   getProfile: async (): Promise<User> => {
-    const response = await api.get('/users/profile');
-    return response.data;
+    const response = await api.get('/auth/validate');
+    return response.data.user;
   },
 
   updateProfile: async (userData: Partial<User>) => {
-    const response = await api.put('/users/profile', userData);
+    const response = await api.put('/user/profile', userData);
     return response.data;
   },
 };
-

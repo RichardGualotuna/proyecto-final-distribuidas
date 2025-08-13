@@ -39,7 +39,10 @@ const Events: React.FC = () => {
     data: events = [],
     isLoading,
     error,
-  } = useQuery<Event[]>('events', eventService.getAllEvents);
+  } = useQuery<Event[]>('events', eventService.getAllEvents, {
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
 
   const categories = Array.from(new Set(events.map((event) => event.category)));
 
@@ -57,14 +60,26 @@ const Events: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
+      case 'active':
       case 'activo':
         return 'success';
+      case 'cancelled':
       case 'cancelado':
         return 'error';
+      case 'completed':
       case 'completado':
         return 'default';
       default:
         return 'primary';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, 'EEEE, d MMMM yyyy', { locale: es });
+    } catch (error) {
+      return dateString;
     }
   };
 
@@ -181,15 +196,15 @@ const Events: React.FC = () => {
                   </Box>
                   
                   <Typography color="text.secondary" paragraph sx={{ mb: 2 }}>
-                    {event.description.length > 100
+                    {event.description && event.description.length > 100
                       ? `${event.description.substring(0, 100)}...`
-                      : event.description}
+                      : event.description || 'Sin descripción'}
                   </Typography>
 
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                     <CalendarIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
                     <Typography variant="body2" color="text.secondary">
-                      {format(new Date(event.date), 'EEEE, d MMMM yyyy', { locale: es })}
+                      {formatDate(event.date)}
                     </Typography>
                   </Box>
 
@@ -226,4 +241,3 @@ const Events: React.FC = () => {
 };
 
 export default Events;
-

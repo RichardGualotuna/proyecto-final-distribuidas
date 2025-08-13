@@ -36,18 +36,30 @@ const Login: React.FC = () => {
 
   const loginMutation = useMutation(authService.login, {
     onSuccess: (data) => {
-      login(data.user, data.token);
-      toast.success('¡Bienvenido de vuelta!');
-      navigate('/');
+      console.log('Respuesta del login:', data);
+      
+      if (data.user && data.token) {
+        login(data.user, data.token);
+        toast.success(`¡Bienvenido ${data.user.firstName}!`);
+        navigate('/');
+      } else {
+        setError('Respuesta inválida del servidor');
+        toast.error('Error en la respuesta del servidor');
+      }
     },
     onError: (error: any) => {
-      setError(error.response?.data?.message || 'Error al iniciar sesión');
-      toast.error('Error al iniciar sesión');
+      console.error('Error de login:', error);
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          'Error al iniciar sesión';
+      setError(errorMessage);
+      toast.error(errorMessage);
     },
   });
 
   const onSubmit = (data: LoginCredentials) => {
     setError('');
+    console.log('Intentando login con:', { email: data.email });
     loginMutation.mutate(data);
   };
 
@@ -165,4 +177,3 @@ const Login: React.FC = () => {
 };
 
 export default Login;
-

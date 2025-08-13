@@ -9,32 +9,39 @@ const { connectRabbitMQ } = require('./src/config/rabbitmq');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// MIDDLEWARES - ORDEN IMPORTANTE
 app.use(cors());
-app.use(express.json());
+app.use(express.json());                          
+app.use(express.urlencoded({ extended: true })); 
 
-app.use('/api/event', eventRoutes);
-app.use('/api/zone', zoneRoutes);
+// RUTAS
+app.use('/api/event', eventRoutes);  
+app.use('/api/zone', zoneRoutes);    
+
+// PARA EL PROXY del API Gateway, las rutas deben ser:
+app.use('/', eventRoutes);  // ✅ Correcto para el proxy
+// app.use('/zone', zoneRoutes);  // Si tienes zone service separado
 
 app.get('/', (req, res) => {
   res.status(200).send('Event microservice is running');
 });
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error('❌ ERROR:', err);
+  res.status(500).json({ error: 'Internal Server Error', details: err.message });
 });
 
 sequelize.sync()
   .then(() => {
-    console.log('Database connected and models synchronized');
+    console.log('✅ Database connected and models synchronized');
     return connectRabbitMQ();
   })
   .then(() => {
-    console.log('Connected to RabbitMQ');
+    console.log('✅ Connected to RabbitMQ');
     app.listen(PORT, () => {
-      console.log(`Server listening on port ${PORT}`);
+      console.log(`✅ Event Service listening on port ${PORT}`);
     });
   })
   .catch((err) => {
-    console.error('Startup failed:', err);
+    console.error('❌ Startup failed:', err);
   });

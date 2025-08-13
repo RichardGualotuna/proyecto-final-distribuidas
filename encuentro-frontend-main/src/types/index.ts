@@ -65,7 +65,8 @@ export interface CreateEventData {
   category: string;
   totalCapacity: number;
   visibility: string;
-  zones: Omit<Zone, 'zoneId' | 'eventId' | 'createdAt' | 'updatedAt'>[];
+  organizerId?: number;
+  zones?: Omit<Zone, 'zoneId' | 'eventId' | 'createdAt' | 'updatedAt'>[];
 }
 
 export interface ApiResponse<T> {
@@ -73,4 +74,3 @@ export interface ApiResponse<T> {
   data: T;
   message?: string;
 }
-

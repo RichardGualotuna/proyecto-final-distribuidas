@@ -29,10 +29,12 @@ import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { eventService } from '../services/eventService';
 import { CreateEventData } from '../types';
+import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
 
 const CreateEvent: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [error, setError] = useState<string>('');
 
   const {
@@ -70,14 +72,44 @@ const CreateEvent: React.FC = () => {
       navigate('/events');
     },
     onError: (error: any) => {
-      setError(error.response?.data?.message || 'Error al crear el evento');
-      toast.error('Error al crear el evento');
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          'Error al crear el evento';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      console.error('Error completo:', error.response?.data);
     },
   });
 
   const onSubmit = (data: CreateEventData) => {
     setError('');
-    createEventMutation.mutate(data);
+    
+    // Validaciones adicionales
+    if (!user) {
+      setError('Debes estar autenticado para crear un evento');
+      toast.error('Debes estar autenticado para crear un evento');
+      return;
+    }
+
+    // Validar que el token esté presente
+    const authStorage = localStorage.getItem('auth-storage');
+    if (!authStorage) {
+      setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      toast.error('Sesión expirada');
+      navigate('/login');
+      return;
+    }
+
+    // Formatear los datos antes de enviar
+    const formattedData = {
+      ...data,
+      totalCapacity: Number(data.totalCapacity),
+      organizerId: user.userId,
+    };
+
+    console.log('Usuario autenticado:', user);
+    console.log('Datos a enviar:', formattedData);
+    createEventMutation.mutate(formattedData);
   };
 
   const categories = [
@@ -176,7 +208,12 @@ const CreateEvent: React.FC = () => {
                     <DatePicker
                       label="Fecha del Evento"
                       value={field.value ? new Date(field.value) : null}
-                      onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                      onChange={(date) => {
+                        if (date) {
+                          const formattedDate = date.toISOString().split('T')[0];
+                          field.onChange(formattedDate);
+                        }
+                      }}
                       slotProps={{
                         textField: {
                           fullWidth: true,
@@ -200,7 +237,12 @@ const CreateEvent: React.FC = () => {
                     <TimePicker
                       label="Hora del Evento"
                       value={field.value ? new Date(`2000-01-01T${field.value}`) : null}
-                      onChange={(time) => field.onChange(time?.toTimeString().slice(0, 5))}
+                      onChange={(time) => {
+                        if (time) {
+                          const formattedTime = time.toTimeString().slice(0, 8);
+                          field.onChange(formattedTime);
+                        }
+                      }}
                       slotProps={{
                         textField: {
                           fullWidth: true,
@@ -273,6 +315,7 @@ const CreateEvent: React.FC = () => {
                       label="Capacidad Total"
                       error={!!errors.totalCapacity}
                       helperText={errors.totalCapacity?.message}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   )}
                 />
@@ -297,113 +340,6 @@ const CreateEvent: React.FC = () => {
                 />
               </Grid>
             </Grid>
-
-            <Divider sx={{ my: 4 }} />
-
-            {/* Zonas del evento */}
-            <Box sx={{ mb: 4 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5">
-                  Zonas del Evento
-                </Typography>
-                <Button
-                  startIcon={<AddIcon />}
-                  onClick={() => append({ zoneName: '', price: 0, zoneCapacity: 0 })}
-                  variant="outlined"
-                >
-                  Agregar Zona
-                </Button>
-              </Box>
-
-              {fields.map((field, index) => (
-                <Card key={field.id} sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="h6">
-                        Zona {index + 1}
-                      </Typography>
-                      {fields.length > 1 && (
-                        <IconButton
-                          onClick={() => remove(index)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      )}
-                    </Box>
-
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={4}>
-                        <Controller
-                          name={`zones.${index}.zoneName`}
-                          control={control}
-                          rules={{
-                            required: 'El nombre de la zona es requerido',
-                          }}
-                          render={({ field }) => (
-                            <TextField
-                              {...field}
-                              fullWidth
-                              label="Nombre de la Zona"
-                              error={!!errors.zones?.[index]?.zoneName}
-                              helperText={errors.zones?.[index]?.zoneName?.message}
-                            />
-                          )}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12} sm={4}>
-                        <Controller
-                          name={`zones.${index}.price`}
-                          control={control}
-                          rules={{
-                            required: 'El precio es requerido',
-                            min: {
-                              value: 0,
-                              message: 'El precio debe ser mayor o igual a 0',
-                            },
-                          }}
-                          render={({ field }) => (
-                            <TextField
-                              {...field}
-                              fullWidth
-                              type="number"
-                              label="Precio"
-                              error={!!errors.zones?.[index]?.price}
-                              helperText={errors.zones?.[index]?.price?.message}
-                            />
-                          )}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12} sm={4}>
-                        <Controller
-                          name={`zones.${index}.zoneCapacity`}
-                          control={control}
-                          rules={{
-                            required: 'La capacidad es requerida',
-                            min: {
-                              value: 1,
-                              message: 'La capacidad debe ser mayor a 0',
-                            },
-                          }}
-                          render={({ field }) => (
-                            <TextField
-                              {...field}
-                              fullWidth
-                              type="number"
-                              label="Capacidad"
-                              error={!!errors.zones?.[index]?.zoneCapacity}
-                              helperText={errors.zones?.[index]?.zoneCapacity?.message}
-                            />
-                          )}
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
               <Button
@@ -432,4 +368,3 @@ const CreateEvent: React.FC = () => {
 };
 
 export default CreateEvent;
-

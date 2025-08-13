@@ -30,9 +30,9 @@ app.use('/api/event', createProxyMiddleware({
   logLevel: 'debug'
 }));
 
-// Proxy para zone service
+// Proxy para zone service - CORREGIDO EL PUERTO
 app.use('/api/zone', createProxyMiddleware({
-  target: process.env.ZONE_SERVICE_URL || 'http://localhost:3000',
+  target: process.env.ZONE_SERVICE_URL || 'http://localhost:3001',
   changeOrigin: true,
   pathRewrite: {
     '^/api/zone': ''
