@@ -1,6 +1,7 @@
+// src/pages/EventDetail.tsx - ACTUALIZADO CON ELIMINAR
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { useQuery, useMutation } from 'react-query';
 import {
   Box,
   Typography,
@@ -13,24 +14,11 @@ import {
   CircularProgress,
   Alert,
   Divider,
-  List,
-  ListItem,
-  ListItemText,
   Paper,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Avatar,
 } from '@mui/material';
 import {
@@ -46,6 +34,7 @@ import {
   Bookmark as BookmarkIcon,
   PersonAdd as PersonAddIcon,
   AttachMoney as MoneyIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -60,10 +49,11 @@ const EventDetail: React.FC = () => {
   const { user, isAuthenticated } = useAuthStore();
   const eventId = parseInt(id || '0');
   
-  // Estados para la reserva
+  // Estados para la reserva y eliminación
   const [reservationDialog, setReservationDialog] = useState(false);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [shareDialog, setShareDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
 
   const {
     data: event,
@@ -83,6 +73,21 @@ const EventDetail: React.FC = () => {
   } = useQuery<Zone[]>(['zones', eventId], () => eventService.getEventZones(eventId), {
     enabled: !!eventId,
     retry: 2,
+  });
+
+  // Mutación para eliminar evento
+  const deleteEventMutation = useMutation(eventService.deleteEvent, {
+    onSuccess: () => {
+      toast.success('Evento eliminado exitosamente');
+      navigate('/events');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          'Error al eliminar el evento';
+      toast.error(errorMessage);
+      console.error('Error al eliminar evento:', error.response?.data);
+    },
   });
 
   const getStatusColor = (status: string) => {
@@ -151,6 +156,14 @@ const EventDetail: React.FC = () => {
     return user && event && user.userId === event.organizerId;
   };
 
+  const isAdmin = () => {
+    return user && user.role === 'admin';
+  };
+
+  const canDeleteEvent = () => {
+    return isOwner() || isAdmin();
+  };
+
   const handleReservation = (zone: Zone) => {
     if (!isAuthenticated) {
       toast.error('Debes iniciar sesión para reservar');
@@ -164,6 +177,17 @@ const EventDetail: React.FC = () => {
 
   const handleShare = () => {
     setShareDialog(true);
+  };
+
+  const handleDeleteEvent = () => {
+    setDeleteDialog(true);
+  };
+
+  const confirmDeleteEvent = () => {
+    if (eventId) {
+      deleteEventMutation.mutate(eventId);
+    }
+    setDeleteDialog(false);
   };
 
   const copyToClipboard = () => {
@@ -254,6 +278,13 @@ const EventDetail: React.FC = () => {
             <Chip
               label="Tu evento"
               color="info"
+              size="small"
+            />
+          )}
+          {isAdmin() && (
+            <Chip
+              label="Admin"
+              color="secondary"
               size="small"
             />
           )}
@@ -476,6 +507,24 @@ const EventDetail: React.FC = () => {
                     </Button>
                   </>
                 )}
+                
+                {/* NUEVO: Botón de eliminar para propietarios y administradores */}
+                {canDeleteEvent() && (
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={handleDeleteEvent}
+                    disabled={deleteEventMutation.isLoading}
+                  >
+                    {deleteEventMutation.isLoading ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      'Eliminar Evento'
+                    )}
+                  </Button>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -568,6 +617,70 @@ const EventDetail: React.FC = () => {
           </Box>
         )}
       </Box>
+
+      {/* Dialog de confirmación para eliminar evento */}
+      <Dialog
+        open={deleteDialog}
+        onClose={() => setDeleteDialog(false)}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          ¿Confirmar eliminación del evento?
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            ¿Estás seguro de que quieres eliminar el evento "{event.title}"?
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Esta acción no se puede deshacer. Se eliminarán todas las zonas asociadas y reservas existentes.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialog(false)}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={confirmDeleteEvent} 
+            color="error" 
+            variant="contained"
+            disabled={deleteEventMutation.isLoading}
+          >
+            {deleteEventMutation.isLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Eliminar Evento'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog para compartir */}
+      <Dialog
+        open={shareDialog}
+        onClose={() => setShareDialog(false)}
+        aria-labelledby="share-dialog-title"
+      >
+        <DialogTitle id="share-dialog-title">
+          Compartir Evento
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            Comparte este evento con tus amigos
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {window.location.href}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShareDialog(false)}>
+            Cerrar
+          </Button>
+          <Button onClick={copyToClipboard} variant="contained">
+            Copiar Enlace
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

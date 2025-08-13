@@ -1,3 +1,4 @@
+// encuentro-backend-main/ms-events/src/models/zone.model.js - VERIFICADO
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
@@ -7,10 +8,37 @@ const Zone = sequelize.define('Zone', {
     primaryKey: true,
     autoIncrement: true,
   },
-  zoneName: DataTypes.STRING,
-  price: DataTypes.FLOAT,
-  zoneCapacity: DataTypes.INTEGER,
-  eventId: DataTypes.INTEGER,
+  zoneName: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    validate: {
+      notEmpty: true,
+      len: [1, 100]
+    }
+  },
+  price: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    validate: {
+      min: 0,
+      isFloat: true
+    }
+  },
+  zoneCapacity: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    validate: {
+      min: 1,
+      isInt: true
+    }
+  },
+  eventId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    validate: {
+      isInt: true
+    }
+  },
 }, {
   tableName: 'zones',
   timestamps: true,

@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const services = require('./src/config/services');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -10,7 +9,7 @@ app.disable('x-powered-by');
 app.use(require('cors')());
 app.use(require('morgan')('dev'));
 
-// Proxy para auth service (rutas públicas)
+// Proxy para auth service
 app.use('/api/auth', createProxyMiddleware({
   target: process.env.AUTH_SERVICE_URL || 'http://localhost:3004',
   changeOrigin: true,
@@ -30,12 +29,12 @@ app.use('/api/event', createProxyMiddleware({
   logLevel: 'debug'
 }));
 
-// Proxy para zone service - CORREGIDO
+// Proxy para zone service
 app.use('/api/zone', createProxyMiddleware({
-  target: process.env.EVENT_SERVICE_URL || 'http://localhost:3000',  
+  target: process.env.EVENT_SERVICE_URL || 'http://localhost:3000',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/zone': '/zone'  
+    '^/api/zone': '/zone'
   },
   logLevel: 'debug'
 }));
@@ -50,22 +49,22 @@ app.use('/api/user', createProxyMiddleware({
   logLevel: 'debug'
 }));
 
-// Proxy para reservation service
+// Proxy para reservation service - CORREGIDO
 app.use('/api/reservation', createProxyMiddleware({
   target: process.env.RESERVATION_SERVICE_URL || 'http://localhost:3002',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/reservation': ''
+    '^/api/reservation': '/api/reservation'  // Mantener la ruta completa
   },
   logLevel: 'debug'
 }));
 
-// Proxy para ticket service
+// Proxy para ticket service - CORREGIDO
 app.use('/api/ticket', createProxyMiddleware({
-  target: process.env.TICKET_SERVICE_URL || 'http://localhost:3002',
+  target: process.env.TICKET_SERVICE_URL || 'http://localhost:3002',  // Puerto correcto
   changeOrigin: true,
   pathRewrite: {
-    '^/api/ticket': ''
+    '^/api/ticket': '/api/ticket'  // Mantener la ruta completa
   },
   logLevel: 'debug'
 }));
@@ -75,7 +74,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'running', timestamp: new Date().toISOString() });
 });
 
-// Ruta de prueba para verificar que el API Gateway está funcionando
+// Ruta de prueba
 app.get('/', (req, res) => {
   res.json({ 
     message: 'API Gateway is running',
@@ -93,10 +92,10 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`API Gateway running on port ${PORT}`);
   console.log('Available routes:');
-  console.log('- /api/auth -> Auth Service');
-  console.log('- /api/event -> Event Service');
-  console.log('- /api/zone -> Zone Service');
-  console.log('- /api/user -> User Service');
-  console.log('- /api/reservation -> Reservation Service');
-  console.log('- /api/ticket -> Ticket Service');
+  console.log('- /api/auth -> Auth Service (3004)');
+  console.log('- /api/event -> Event Service (3000)');
+  console.log('- /api/zone -> Zone Service (3000)');
+  console.log('- /api/user -> User Service (3003)');
+  console.log('- /api/reservation -> Payment Service (3002)');
+  console.log('- /api/ticket -> Payment Service (3002)');
 });

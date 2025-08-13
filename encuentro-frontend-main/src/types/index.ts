@@ -22,7 +22,7 @@ export interface Event {
   organizerId: number;
   createdAt?: string;
   updatedAt?: string;
-  zones?: Zone[]; // Agregar zonas opcionales al evento
+  zones?: Zone[];
 }
 
 export interface Zone {
@@ -35,6 +35,54 @@ export interface Zone {
   updatedAt?: string;
 }
 
+// NUEVOS TIPOS PARA PAYMENTS
+export interface Ticket {
+  ticketId: number;
+  qrCode: string;
+  status: 'paid' | 'pending' | 'cancelled';
+  zoneId: number;
+  clientId: number;
+  purchaseDate: string;
+  paymentMethod: 'card' | 'cash' | 'transfer' | 'none';
+  createdAt?: string;
+  updatedAt?: string;
+  zone?: Zone;
+  event?: Event;
+}
+
+export interface Reservation {
+  reservationId: number;
+  ticketId: number;
+  reservationDate: string;
+  expirationDate: string;
+  status: 'reserved' | 'expired' | 'confirmed';
+  createdAt?: string;
+  updatedAt?: string;
+  ticket?: Ticket;
+}
+
+export interface CreateTicketData {
+  zoneId: number;
+  clientId: number;
+  paymentMethod: 'card' | 'cash' | 'transfer' | 'none';
+}
+
+export interface CreateReservationData {
+  ticketId: number;
+  expirationDate?: string; // Si no se envía, el backend puede calcular 24h
+}
+
+export interface PaymentSummary {
+  eventTitle: string;
+  zoneName: string;
+  price: number;
+  quantity: number;
+  subtotal: number;
+  taxes: number;
+  total: number;
+}
+
+// Tipos existentes...
 export interface Alert {
   alertId: number;
   message: string;
@@ -67,24 +115,21 @@ export interface CreateEventData {
   totalCapacity: number;
   visibility: string;
   organizerId?: number;
-  zones?: CreateZoneData[]; // Cambiar a un tipo más específico
+  zones?: CreateZoneData[];
 }
 
-// Nuevo tipo para crear zonas
 export interface CreateZoneData {
   zoneName: string;
   price: number;
   zoneCapacity: number;
 }
 
-// Tipo para las respuestas de la API
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
 }
 
-// Tipos para eventos con zonas incluidas
 export interface EventWithZones extends Event {
   zones: Zone[];
 }

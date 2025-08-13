@@ -1,3 +1,4 @@
+// src/components/Layout.tsx - ACTUALIZADO
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
@@ -16,6 +17,7 @@ import {
   Event as EventIcon,
   Person as PersonIcon,
   ExitToApp as LogoutIcon,
+  ConfirmationNumber as TicketIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '../stores/authStore';
 
@@ -68,6 +70,16 @@ const Layout: React.FC = () => {
                 >
                   Crear Evento
                 </Button>
+                
+                {/* NUEVO: Botón para Mis Tickets */}
+                <Button
+                  color="inherit"
+                  startIcon={<TicketIcon />}
+                  onClick={() => navigate('/my-tickets')}
+                >
+                  Mis Tickets
+                </Button>
+                
                 <IconButton
                   size="large"
                   aria-label="account of current user"
@@ -97,6 +109,10 @@ const Layout: React.FC = () => {
                 >
                   <MenuItem onClick={() => { navigate('/profile'); handleClose(); }}>
                     Perfil
+                  </MenuItem>
+                  <MenuItem onClick={() => { navigate('/my-tickets'); handleClose(); }}>
+                    <TicketIcon sx={{ mr: 1 }} />
+                    Mis Tickets
                   </MenuItem>
                   <MenuItem onClick={handleLogout}>
                     <LogoutIcon sx={{ mr: 1 }} />
@@ -151,4 +167,3 @@ const Layout: React.FC = () => {
 };
 
 export default Layout;
-

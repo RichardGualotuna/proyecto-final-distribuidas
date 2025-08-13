@@ -1,3 +1,4 @@
+// src/services/eventService.ts - ACTUALIZADO
 import api from './api';
 import { Event, CreateEventData, Zone } from '../types';
 
@@ -14,7 +15,6 @@ export const eventService = {
 
   createEvent: async (eventData: CreateEventData): Promise<Event> => {
     try {
-      // Estructura los datos según lo que espera el backend actual
       const eventPayload = {
         title: eventData.title,
         description: eventData.description,
@@ -30,19 +30,16 @@ export const eventService = {
 
       console.log('Creando evento:', eventPayload);
       
-      // Crear el evento
       const eventResponse = await api.post('/event', eventPayload);
       const createdEvent = eventResponse.data;
       
       console.log('Evento creado:', createdEvent);
 
-      // Si hay zonas configuradas, crearlas después del evento
       if (eventData.zones && eventData.zones.length > 0) {
         console.log('Creando zonas para el evento:', createdEvent.eventId);
         
         const createdZones = [];
         
-        // Crear zonas una por una para mejor control de errores
         for (const zone of eventData.zones) {
           try {
             const zonePayload = {
@@ -61,7 +58,6 @@ export const eventService = {
             console.error('Error response:', zoneError.response?.data);
             console.error('Error status:', zoneError.response?.status);
             console.error('Error completo:', zoneError);
-            // Continuar con las demás zonas pero mostrar el error
           }
         }
         
@@ -71,7 +67,6 @@ export const eventService = {
           console.warn('Algunas zonas no se pudieron crear');
         }
         
-        // Agregar las zonas creadas al evento para la respuesta
         createdEvent.zones = createdZones;
       }
 
@@ -87,6 +82,7 @@ export const eventService = {
     return response.data;
   },
 
+  // NUEVA FUNCIÓN: Eliminar evento
   deleteEvent: async (id: number): Promise<void> => {
     await api.delete(`/event/${id}`);
   },
@@ -106,7 +102,6 @@ export const eventService = {
     try {
       console.log('Obteniendo zonas para evento:', eventId);
       
-      // Intentar obtener todas las zonas y filtrar por eventId
       const response = await api.get('/zone');
       console.log('Respuesta completa de zonas:', response.data);
       
@@ -115,7 +110,6 @@ export const eventService = {
         return [];
       }
       
-      // Filtrar las zonas por eventId y validar estructura
       const filteredZones = response.data.filter((zone: any) => {
         if (!zone || typeof zone !== 'object') {
           console.warn('Zona inválida encontrada:', zone);
@@ -133,7 +127,6 @@ export const eventService = {
       
       console.log('Zonas filtradas para evento', eventId, ':', filteredZones);
       
-      // Asegurar que los campos numéricos sean números
       const validatedZones = filteredZones.map((zone: any) => ({
         ...zone,
         price: Number(zone.price) || 0,
